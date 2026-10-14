@@ -1,5 +1,2 @@
-
-```text
-streamlit>=1.40.0,<2.0.0
-pandas>=2.0.0,<3.0.0
-```
+streamlit
+google-generativeai
