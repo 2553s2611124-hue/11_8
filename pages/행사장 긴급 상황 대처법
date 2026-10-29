@@ -1,1 +1,421 @@
 
+import streamlit as st
+from datetime import datetime
+
+st.set_page_config(
+    page_title="행사장 긴급 상황 대처법",
+    page_icon="🚨",
+    layout="wide",
+)
+
+# -----------------------------
+# 디자인
+# -----------------------------
+st.markdown("""
+<style>
+.stApp {
+    background-color: #f4f7fb;
+}
+.block-container {
+    max-width: 1000px;
+    padding-top: 2rem;
+}
+.hero {
+    background: linear-gradient(135deg, #14213d, #274c77);
+    color: white;
+    padding: 28px;
+    border-radius: 18px;
+    margin-bottom: 20px;
+}
+.hero h1 {
+    color: white;
+    font-size: 2rem;
+}
+.hero p {
+    color: #e5edf7;
+}
+.alert {
+    padding: 16px;
+    background: #fff0ed;
+    border-left: 5px solid #dc2626;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+div.stButton > button {
+    border-radius: 10px;
+    min-height: 42px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# 상황별 안내 데이터
+# -----------------------------
+GUIDES = {
+    "🔥 화재 및 연기": {
+        "phone": "119",
+        "summary": "화재를 발견하면 주변에 알리고 안전한 비상구로 대피하세요.",
+        "steps": [
+            "주변 사람에게 화재 사실을 알립니다.",
+            "안전한 장소에서 119에 신고합니다.",
+            "연기와 불길을 피해 가까운 안전한 비상구로 이동합니다.",
+            "엘리베이터를 이용하지 말고 계단 등 안전한 대피 경로를 이용합니다.",
+            "건물 밖으로 나간 후 안전요원의 안내를 따릅니다.",
+        ],
+        "avoid": [
+            "짐을 가지러 화재 장소로 돌아가기",
+            "엘리베이터 이용하기",
+            "통제된 장소에 다시 들어가기",
+        ],
+    },
+    "👥 인파 밀집 및 압박 사고": {
+        "phone": "119",
+        "summary": "사람들이 심하게 밀리거나 호흡이 어렵다면 즉시 안전요원에게 알리세요.",
+        "steps": [
+            "사람들을 밀거나 인파를 거슬러 뛰지 않습니다.",
+            "팔을 가슴 앞에 모아 흉부 공간을 확보하도록 노력합니다.",
+            "가능하면 압박이 덜한 가장자리나 열린 공간으로 천천히 이동합니다.",
+            "넘어진 사람을 발견하면 안전요원에게 즉시 알립니다.",
+            "호흡 곤란이나 부상자가 발생하면 119에 신고합니다.",
+        ],
+        "avoid": [
+            "인파 속에서 갑자기 역주행하기",
+            "사람들을 밀면서 이동하기",
+            "위험 구역에 무리하게 진입하기",
+        ],
+    },
+    "🩺 응급환자 및 심정지": {
+        "phone": "119",
+        "summary": "의식이 없거나 정상적으로 호흡하지 않는 사람은 즉시 119에 신고하세요.",
+        "steps": [
+            "현장에 추가 위험이 없는지 확인합니다.",
+            "주변 사람에게 119 신고와 AED 요청을 부탁합니다.",
+            "정상 호흡이 없으면 119 상담원의 안내에 따라 심폐소생술을 시작합니다.",
+            "AED가 도착하면 전원을 켜고 음성 안내를 따릅니다.",
+            "구급대원이 도착할 때까지 안내에 따라 대응합니다.",
+        ],
+        "avoid": [
+            "신고를 미루기",
+            "의식이 없는 사람에게 음식이나 물을 주기",
+            "불필요하게 환자를 움직이기",
+        ],
+    },
+    "🤕 넘어짐 및 부상": {
+        "phone": "119",
+        "summary": "추가 사고를 막고 부상 정도를 확인한 뒤 필요한 도움을 요청하세요.",
+        "steps": [
+            "주변에 추가 위험이 없는지 확인합니다.",
+            "출혈이 있다면 가능한 경우 깨끗한 천으로 상처를 직접 압박합니다.",
+            "머리나 목, 척추 손상이 의심되면 함부로 움직이지 않습니다.",
+            "심한 출혈이나 의식 저하가 있으면 119에 신고합니다.",
+            "현장 안전요원과 구급대원의 안내를 따릅니다.",
+        ],
+        "avoid": [
+            "큰 부상을 입은 사람을 무리하게 일으키기",
+            "목이나 허리를 강제로 움직이기",
+            "위험한 장소에서 처치를 계속하기",
+        ],
+    },
+    "🚨 폭력 및 위협": {
+        "phone": "112",
+        "summary": "위협하는 사람과 거리를 확보하고 안전한 장소로 이동하세요.",
+        "steps": [
+            "위협하는 사람과 맞서지 말고 안전한 거리를 확보합니다.",
+            "가능하면 안전한 출구를 통해 현장을 벗어납니다.",
+            "이동이 위험하면 안전한 공간에 머물며 도움을 요청합니다.",
+            "범죄나 폭력 상황은 112에 신고합니다.",
+            "부상자가 있으면 안전 확보 후 119에도 신고합니다.",
+        ],
+        "avoid": [
+            "위험한 사람을 직접 제압하기",
+            "위험을 무릅쓰고 촬영하기",
+            "안전이 확인되지 않은 장소에 접근하기",
+        ],
+    },
+    "🌧️ 기타 사고 및 재난": {
+        "phone": "119",
+        "summary": "현장 안내방송과 관계기관의 대피 지시를 확인하세요.",
+        "steps": [
+            "안전요원과 안내방송의 지시를 따릅니다.",
+            "침수, 낙하물, 전기 설비 등 위험 요소를 피합니다.",
+            "고립된 사람이나 부상자가 있으면 구조기관에 알립니다.",
+            "생명이나 신체에 즉각적인 위험이 있으면 119에 신고합니다.",
+            "안전이 확인되기 전에는 통제 구역에 들어가지 않습니다.",
+        ],
+        "avoid": [
+            "통제선을 넘어 위험 지역에 진입하기",
+            "침수 지역이나 끊어진 전선에 접근하기",
+            "확인되지 않은 정보를 퍼뜨리기",
+        ],
+    },
+}
+
+# -----------------------------
+# 상단 헤더
+# -----------------------------
+st.markdown("""
+<div class="hero">
+    <h1>🚨 행사장 긴급 상황 대처법</h1>
+    <p>
+        축제 · 공연장 · 체육관 · 전시장<br>
+        긴급 전화번호와 사고 대처 방법을 빠르게 확인하세요.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="alert">
+<strong>긴급 상황인가요?</strong><br>
+화재·구급·구조는 119, 범죄·폭력 신고는 112입니다.
+앱을 확인하느라 긴급 신고를 늦추지 마세요.
+</div>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# 메뉴
+# -----------------------------
+menu = st.sidebar.radio(
+    "🧭 안전 안내 메뉴",
+    [
+        "긴급 전화",
+        "상황별 대처법",
+        "안전 체크리스트",
+        "사고 신고 메모",
+    ],
+)
+
+st.sidebar.divider()
+st.sidebar.caption("대한민국 기준 안내")
+st.sidebar.caption("실제 현장에서는 소방·경찰 및 안전요원의 지시를 우선하세요.")
+
+# -----------------------------
+# 1. 긴급 전화
+# -----------------------------
+if menu == "긴급 전화":
+    st.header("📞 긴급 전화번호")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🚓 경찰 신고")
+        st.markdown("## 112")
+        st.write("범죄, 폭력, 위협 등 긴급한 경찰 출동")
+        st.link_button(
+            "📞 112 전화 연결",
+            "tel:112",
+            use_container_width=True,
+        )
+
+    with col2:
+        st.subheader("🚒 화재·구급·구조")
+        st.markdown("## 119")
+        st.write("화재, 응급환자, 구조 요청")
+        st.link_button(
+            "📞 119 전화 연결",
+            "tel:119",
+            use_container_width=True,
+        )
+
+    st.divider()
+    st.subheader("신고할 때 전달할 내용")
+
+    st.markdown("""
+    1. **장소:** 행사장 이름, 주소, 출입구 번호
+    2. **상황:** 화재, 압박 사고, 의식 불명 등
+    3. **피해:** 부상자 수와 확인된 상태
+    4. **위험:** 연기, 추가 압박, 폭력 등
+    5. **연락처:** 신고자 전화번호
+    """)
+
+    st.info(
+        "정확한 주소를 모르면 행사장 이름, 주변 건물, "
+        "출입구 번호 등 위치를 특정할 수 있는 정보를 알려주세요."
+    )
+
+# -----------------------------
+# 2. 상황별 대처법
+# -----------------------------
+elif menu == "상황별 대처법":
+    st.header("🛟 상황별 대처 가이드")
+    st.write("현재 상황과 가장 가까운 항목을 선택하세요.")
+
+    situation = st.selectbox(
+        "어떤 상황인가요?",
+        list(GUIDES.keys()),
+    )
+
+    guide = GUIDES[situation]
+
+    st.subheader(situation)
+    st.warning(guide["summary"])
+
+    st.markdown("### 해야 할 일")
+
+    for i, step in enumerate(guide["steps"], start=1):
+        st.markdown(f"**{i}.** {step}")
+
+    st.markdown("### 피해야 할 행동")
+
+    for item in guide["avoid"]:
+        st.markdown(f"- ❌ {item}")
+
+    st.divider()
+    st.subheader("📞 긴급 전화")
+
+    st.link_button(
+        f"{guide['phone']} 전화 연결",
+        f"tel:{guide['phone']}",
+        use_container_width=True,
+    )
+
+    st.caption(
+        "이 안내는 일반적인 안전 정보입니다. "
+        "현장 상황에 따라 행동 방법이 달라질 수 있습니다."
+    )
+
+# -----------------------------
+# 3. 안전 체크리스트
+# -----------------------------
+elif menu == "안전 체크리스트":
+    st.header("✅ 행사장 안전 체크리스트")
+    st.write("행사 시작 전 또는 현장 도착 직후 확인하세요.")
+
+    tasks = [
+        "가까운 비상구와 대피 경로를 확인했다.",
+        "행사장 밖의 안전한 만남 장소를 정했다.",
+        "안전요원 또는 안내데스크 위치를 확인했다.",
+        "휴대전화 배터리와 긴급 연락 수단을 확인했다.",
+        "일행과 헤어졌을 때 연락 방법을 정했다.",
+        "출입구와 통로를 막지 않도록 주의한다.",
+        "AED 등 응급 지원 위치를 확인했다.",
+    ]
+
+    if "checklist_state" not in st.session_state:
+        st.session_state.checklist_state = [False] * len(tasks)
+
+    with st.form("checklist_form"):
+        checked = []
+
+        for i, task in enumerate(tasks):
+            value = st.checkbox(
+                task,
+                value=st.session_state.checklist_state[i],
+                key=f"check_{i}",
+            )
+            checked.append(value)
+
+        submitted = st.form_submit_button(
+            "체크리스트 저장",
+            use_container_width=True,
+        )
+
+    if submitted:
+        st.session_state.checklist_state = checked
+        completed = sum(checked)
+        st.success(f"{completed} / {len(tasks)}개 항목 확인 완료")
+
+    completed = sum(st.session_state.checklist_state)
+    st.progress(completed / len(tasks))
+
+    if completed == len(tasks):
+        st.success("모든 항목을 확인했습니다.")
+    else:
+        st.caption(f"남은 항목: {len(tasks) - completed}개")
+
+    st.info(
+        "체크 상태는 현재 앱 세션에서만 유지됩니다. "
+        "새 세션에서는 초기화될 수 있습니다."
+    )
+
+# -----------------------------
+# 4. 사고 신고 메모
+# -----------------------------
+elif menu == "사고 신고 메모":
+    st.header("📝 사고 상황 정리")
+    st.write(
+        "신고에 필요한 사실을 정리하고 TXT 파일로 저장할 수 있습니다. "
+        "긴급 신고가 우선입니다."
+    )
+
+    with st.form("incident_form"):
+        location = st.text_input(
+            "사고 장소",
+            placeholder="예: 행사장 이름, 출입구 번호, 층수",
+        )
+
+        incident_type = st.selectbox(
+            "사고 유형",
+            [
+                "화재·연기",
+                "인파 밀집·압박",
+                "응급환자",
+                "넘어짐·부상",
+                "폭력·위협",
+                "기타",
+            ],
+        )
+
+        status = st.selectbox(
+            "피해 상황",
+            [
+                "아직 확인되지 않음",
+                "부상자 없음으로 확인",
+                "부상자 있음",
+                "의식 저하 또는 호흡 이상",
+                "다수의 피해자 발생",
+            ],
+        )
+
+        details = st.text_area(
+            "확인한 상황",
+            placeholder="직접 확인한 사실을 간단히 입력하세요.",
+            max_chars=1000,
+        )
+
+        submitted = st.form_submit_button(
+            "사고 메모 만들기",
+            use_container_width=True,
+        )
+
+    if submitted:
+        if not location.strip():
+            st.error("사고 장소를 입력해 주세요.")
+        else:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            note = (
+                "[행사장 사고 상황 메모]\n"
+                f"작성 시각: {timestamp}\n"
+                f"사고 장소: {location.strip()}\n"
+                f"사고 유형: {incident_type}\n"
+                f"피해 상황: {status}\n"
+                f"상세 내용: {details.strip() or '추가 정보 없음'}\n"
+            )
+
+            st.success("메모를 만들었습니다.")
+            st.code(note, language="text")
+
+            st.download_button(
+                "📥 TXT 파일 다운로드",
+                data=note,
+                file_name="incident_note.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+
+            st.caption(
+                "메모는 앱 데이터베이스에 저장하지 않습니다. "
+                "개인정보나 민감한 정보는 최소한으로 기록하세요."
+            )
+
+# -----------------------------
+# 하단 안내
+# -----------------------------
+st.divider()
+
+st.caption("행사장 긴급 상황 대처법 | 안전 정보 제공용 앱")
+st.caption(
+    "이 앱은 긴급 신고 시스템이 아닙니다. "
+    "실제 사고에서는 112·119 신고와 현장 관계자의 안내를 우선하세요."
+)
+
