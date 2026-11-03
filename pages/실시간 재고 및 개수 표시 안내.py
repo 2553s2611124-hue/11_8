@@ -5,48 +5,58 @@ import pandas as pd
 # 1. 페이지 기본 설정
 # ==========================================
 st.set_page_config(
-    page_title="실시간 재고 & 개수 안내 대시보드",
+    page_title="실시간 재고 안내 시스템",
     page_icon="📦",
     layout="wide"
 )
 
-# Custom CSS로 가시성 향상
+# Custom CSS (상단 카드 스타일)
 st.markdown("""
     <style>
     .stMetric {
         background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
+        padding: 12px;
+        border-radius: 8px;
         border: 1px solid #e9ecef;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 데이터 초기화 (Session State)
+# 2. 데이터 초기화 및 안전한 타입 정의
 # ==========================================
 if "inventory" not in st.session_state:
-    st.session_state.inventory = pd.DataFrame([
+    initial_data = [
         {"상품코드": "P001", "상품명": "무선 마우스", "카테고리": "전자기기", "보관위치": "A-1", "단가(원)": 25000, "재고수량": 15, "안전재고": 5},
         {"상품코드": "P002", "상품명": "기계식 키보드", "카테고리": "전자기기", "보관위치": "A-2", "단가(원)": 89000, "재고수량": 3, "안전재고": 5},
         {"상품코드": "P003", "상품명": "27인치 모니터", "카테고리": "전자기기", "보관위치": "B-1", "단가(원)": 240000, "재고수량": 0, "안전재고": 2},
         {"상품코드": "P004", "상품명": "A4 복용지(1BOX)", "카테고리": "사무용품", "보관위치": "C-1", "단가(원)": 32000, "재고수량": 45, "안전재고": 10},
         {"상품코드": "P005", "상품명": "유성펜 세트", "카테고리": "사무용품", "보관위치": "C-2", "단가(원)": 4500, "재고수량": 2, "안전재고": 5},
-    ])
+    ]
+    df_init = pd.DataFrame(initial_data)
+    # 수량 관련 칼럼을 강제로 정수형(int)으로 형변환하여 에러 방지
+    df_init["재고수량"] = df_init["재고수량"].astype(int)
+    df_init["안전재고"] = df_init["안전재고"].astype(int)
+    df_init["단가(원)"] = df_init["단가(원)"].astype(int)
+    st.session_state.inventory = df_init
 
+# 세션 데이터 가져오기
 df = st.session_state.inventory
 
 # 재고 상태 판별 함수
-def get_status(row):
-    if row["재고수량"] == 0:
+def calculate_status(row):
+    qty = int(row["재고수량"])
+    safe = int(row["안전재고"])
+    if qty == 0:
         return "🔴 품절"
-    elif row["재고수량"] <= row["안전재고"]:
+    elif qty <= safe:
         return "🟡 부족"
     else:
         return "🟢 정상"
 
+# 상태 칼럼 업데이트
 if not df.empty:
-    df["재고상태"] = df.apply(get_status, axis=1)
+    df["재고상태"] = df.apply(calculate_status, axis=1)
 
 # ==========================================
 # 3. 사이드바 - 메뉴 구성
@@ -86,7 +96,6 @@ if menu == "📊 실시간 재고 현황":
     if df.empty:
         st.info("등록된 재고 상품이 없습니다.")
     else:
-        # 필터 레이아웃
         f_col1, f_col2, f_col3 = st.columns([2, 2, 3])
         
         cats = ["전체"] + sorted(list(df["카테고리"].unique()))
@@ -97,7 +106,7 @@ if menu == "📊 실시간 재고 현황":
         
         search_kw = f_col3.text_input("상품명 검색", placeholder="검색할 상품명을 입력하세요")
         
-        # 필터링 처리
+        # 필터링
         filtered = df.copy()
         if selected_cat != "전체":
             filtered = filtered[filtered["카테고리"] == selected_cat]
@@ -108,10 +117,10 @@ if menu == "📊 실시간 재고 현황":
             
         st.write(f"검색 결과: 총 **{len(filtered)}**건")
         
-        # 표 출력
-        cols = ["상품코드", "상품명", "카테고리", "보관위치", "단가(원)", "재고수량", "안전재고", "재고상태"]
+        # 데이터프레임 출력 (재고수량을 정수형으로 고정)
+        display_cols = ["상품코드", "상품명", "카테고리", "보관위치", "단가(원)", "재고수량", "안전재고", "재고상태"]
         st.dataframe(
-            filtered[cols],
+            filtered[display_cols],
             use_container_width=True,
             hide_index=True
         )
@@ -125,8 +134,8 @@ elif menu == "✏️ 재고 수량 변경":
     if df.empty:
         st.info("조정 가능한 품목이 없습니다.")
     else:
-        # 품목 선택
-        options = [f"{row['상품코드']} | {row['상품명']} (현재: {row['재고수량']}개)" for _, row in df.iterrows()]
+        # 드롭다운 옵션 생성
+        options = [f"{row['상품코드']} | {row['상품명']} (현재: {int(row['재고수량'])}개)" for _, row in df.iterrows()]
         selected_option = st.selectbox("수량을 변경할 품목을 선택하세요", options)
         
         selected_code = selected_option.split(" | ")[0]
@@ -135,23 +144,25 @@ elif menu == "✏️ 재고 수량 변경":
         col_up, col_del = st.columns(2)
         
         with col_up:
-            st.write(f"**선택 품목:** {selected_row['상품명']} ({selected_row['상품코드']})")
-            new_qty = st.number_input("변경할 재고 개수", min_value=0, value=int(selected_row["재고수량"]), step=1)
+            st.markdown(f"**선택 품목:** {selected_row['상품명']} (`{selected_row['상품코드']}`)")
+            current_val = int(selected_row["재고수량"])
+            
+            new_qty = st.number_input("변경할 재고 개수", min_value=0, value=current_val, step=1)
             
             if st.button("수량 저장", type="primary"):
-                st.session_state.inventory.loc[
-                    st.session_state.inventory["상품코드"] == selected_code, "재고수량"
-                ] = new_qty
+                # 값 변경 시 명시적으로 int 타입으로 저장
+                idx = st.session_state.inventory[st.session_state.inventory["상품코드"] == selected_code].index
+                st.session_state.inventory.loc[idx, "재고수량"] = int(new_qty)
                 st.success(f"[{selected_row['상품명']}]의 재고가 {new_qty}개로 변경되었습니다.")
                 st.rerun()
 
         with col_del:
-            st.write("**품목 삭제**")
+            st.markdown("**품목 삭제**")
             st.caption("해당 상품을 목록에서 완전히 제거합니다.")
             if st.button("상품 삭제", type="secondary"):
                 st.session_state.inventory = st.session_state.inventory[
                     st.session_state.inventory["상품코드"] != selected_code
-                ]
+                ].reset_index(drop=True)
                 st.warning(f"[{selected_row['상품명']}] 품목이 삭제되었습니다.")
                 st.rerun()
 
@@ -184,16 +195,17 @@ elif menu == "➕ 신규 품목 등록":
                 st.error("이미 존재하는 상품 코드입니다.")
             else:
                 new_item = {
-                    "상품코드": code,
-                    "상품명": name,
-                    "카테고리": category,
-                    "보관위치": location,
-                    "단가(원)": price,
-                    "재고수량": qty,
-                    "안전재고": safe_qty
+                    "상품코드": str(code),
+                    "상품명": str(name),
+                    "카테고리": str(category),
+                    "보관위치": str(location),
+                    "단가(원)": int(price),
+                    "재고수량": int(qty),
+                    "안전재고": int(safe_qty)
                 }
+                new_df = pd.DataFrame([new_item])
                 st.session_state.inventory = pd.concat(
-                    [st.session_state.inventory, pd.DataFrame([new_item])],
+                    [st.session_state.inventory, new_df],
                     ignore_index=True
                 )
                 st.success(f"[{name}] 품목이 성공적으로 등록되었습니다.")
