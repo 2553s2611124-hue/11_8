@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # ==========================================
-# 1. 페이지 기본 설정 및 스타일링
+# 1. 페이지 기본 설정 및 디자인 (CSS)
 # ==========================================
 st.set_page_config(
     page_title="감성 팝업 & 플리마켓 포털",
@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 커스텀 CSS (안정적인 카드 및 배너 디자인)
+# 플리마켓 스타일에 맞춘 커스텀 CSS
 st.markdown("""
     <style>
     .banner-box {
@@ -35,10 +35,10 @@ st.markdown("""
 # 2. 글로벌 세션 데이터 초기화 (오류 방지)
 # ==========================================
 
-# 2-1. 부스 및 재고 수량 데이터
+# 2-1. 재고/부스 데이터 초기화
 if "flea_inventory" not in st.session_state:
     init_items = [
-        {"부스명": "부스 A (달콤푸드)", "상품명": "수제 수제잼 세트", "카테고리": "수제 푸드", "가격(원)": 8500, "재고수량": 12, "위치": "잔디광장 A-1"},
+        {"부스명": "부스 A (달콤푸드)", "상품명": "수제 딸기잼 세트", "카테고리": "수제 푸드", "가격(원)": 8500, "재고수량": 12, "위치": "잔디광장 A-1"},
         {"부스명": "부스 B (자수공방)", "상품명": "핸드메이드 자수 코스터", "카테고리": "패브릭/소품", "가격(원)": 4500, "재고수량": 2, "위치": "잔디광장 B-3"},
         {"부스명": "부스 C (향기창고)", "상품명": "천연 아로마 캔들", "카테고리": "리빙/향수", "가격(원)": 15000, "재고수량": 0, "위치": "잔디광장 C-2"},
         {"부스명": "부스 B (자수공방)", "상품명": "빈티지 비즈 반지", "카테고리": "악세서리", "가격(원)": 6000, "재고수량": 5, "위치": "잔디광장 B-3"},
@@ -49,11 +49,11 @@ if "flea_inventory" not in st.session_state:
     df_init["재고수량"] = df_init["재고수량"].astype(int)
     st.session_state.flea_inventory = df_init
 
-# 2-2. 셀러 신청 데이터
+# 2-2. 셀러 신청 데이터 초기화
 if "seller_applications" not in st.session_state:
     st.session_state.seller_applications = []
 
-# 2-3. 방명록 데이터
+# 2-3. 방명록 데이터 초기화
 if "guestbook" not in st.session_state:
     st.session_state.guestbook = [
         {"작성자": "민지", "메시지": "자수 코스터 너무 예뻐요! 주말 마실 나오기 딱 좋아요 💛", "별점": "⭐⭐⭐⭐⭐", "작성일": "2026-11-01"},
@@ -65,7 +65,7 @@ if "guestbook" not in st.session_state:
 # ==========================================
 st.sidebar.title("🎪 마켓 가이드 메뉴")
 page = st.sidebar.radio(
-    "실행할 메뉴를 선택하세요:",
+    "페이지를 선택하면 이동합니다:",
     [
         "📖 1. 플리마켓 소개",
         "📦 2. 실시간 부스 & 재고 안내",
@@ -79,7 +79,7 @@ st.sidebar.markdown("📍 **행사 위치:** 중앙공원 잔디광장")
 st.sidebar.markdown("⏰ **운영 시간:** 매주 토/일 11:00 ~ 17:00")
 
 # ==========================================
-# 4. 페이지별 독립 기능 구동
+# 4. 선택 페이지별 기능 구동
 # ==========================================
 
 # ------------------------------------------
@@ -142,7 +142,7 @@ elif page == "📦 2. 실시간 부스 & 재고 안내":
         df_inv_display = df_inv.copy()
         df_inv_display["상태"] = df_inv_display["재고수량"].apply(get_status_tag)
         
-        # 지표
+        # 현황 메트릭 카드
         total_items = len(df_inv_display)
         total_qty = int(df_inv_display["재고수량"].sum())
         sold_out = len(df_inv_display[df_inv_display["재고수량"] == 0])
@@ -154,7 +154,7 @@ elif page == "📦 2. 실시간 부스 & 재고 안내":
         
         st.divider()
         
-        # 필터 레이아웃
+        # 검색 및 필터 레이아웃
         f_c1, f_c2 = st.columns([1, 2])
         cats = ["전체"] + list(df_inv_display["카테고리"].unique())
         selected_cat = f_c1.selectbox("카테고리 필터", cats)
@@ -250,3 +250,7 @@ elif page == "💬 4. 방문객 방명록 & 후기":
     
     st.subheader("📜 최근 방명록 피드")
     for entry in st.session_state.guestbook:
+        with st.container():
+            st.markdown(f"**{entry['작성자']}** `{entry['작성일']}` | {entry['별점']}")
+            st.write(entry["메시지"])
+            st.markdown("---")
